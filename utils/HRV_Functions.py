@@ -800,3 +800,151 @@ def Freq_Analysis_fig(Rpeaks, meth=1, decim=3, Fig=0, M=5, O=50, BTval=10, omega
         P2 = psd[0:centre]
 
     return f, P2
+
+
+def savemetrics(rpeaks, preferences, t_rpeaks: np.ndarray = None):
+    """
+    :param rpeaks:
+    :param preferences:
+    :param t_rpeaks:
+    :return:
+    """
+
+    # Time-domain Statistics
+    SDNN, SDANN, MeanRR, RMSSD, pNN50 = Calculate_Features(Rpeakss, Fs)
+
+    # Frequency-domain Statistics
+    Rpeak_input = Rpeakss / Fs
+    powVLF, powLF, powHF, perpowVLF, perpowLF, perpowHF, peak_freq_VLF, peak_freq_LF, peak_freq_HF, LF_HF_ratio = Freq_Analysis(
+        Rpeak_input, meth=1, decim=3, M=welchL, O=welchO, BTval=btval_input, omega_max=omax_input, order=order)
+    powVLF2, powLF2, powHF2, perpowVLF2, perpowLF2, perpowHF2, peak_freq_VLF2, peak_freq_LF2, peak_freq_HF2, LF_HF_ratio2 = Freq_Analysis(
+        Rpeak_input, meth=2, decim=3, M=welchL, O=welchO, BTval=btval_input, omega_max=omax_input, order=order)
+    powVLF3, powLF3, powHF3, perpowVLF3, perpowLF3, perpowHF3, peak_freq_VLF3, peak_freq_LF3, peak_freq_HF3, LF_HF_ratio3 = Freq_Analysis(
+        Rpeak_input, meth=3, decim=3, M=welchL, O=welchO, BTval=btval_input, omega_max=omax_input, order=order)
+    powVLF4, powLF4, powHF4, perpowVLF4, perpowLF4, perpowHF4, peak_freq_VLF4, peak_freq_LF4, peak_freq_HF4, LF_HF_ratio4 = Freq_Analysis(
+        Rpeak_input, meth=4, decim=3, M=welchL, O=welchO, BTval=btval_input, omega_max=omax_input, order=order)
+
+    mbox = int(Preferences[10])
+    print(mbox)
+    COP = int(Preferences[11])
+    print(COP)
+    m2box = int(Preferences[12])
+    print(m2box)
+    In = int(Preferences[13])
+    print(In)
+
+    # Nonlinear statistics
+    RRI = np.diff(Rpeak_input)
+    #    (pvp, Min=self.minbox, Max=self.maxbox, Inc=self.increm, COP=self.copbox)
+    REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = RQA_plot(RRI, m=int(Preferences[14]), L=int(Preferences[15]))
+    SD1, SD2, c1, c2 = Poincare(RRI)
+    alp1, alp2, F = DFA(RRI, min_box=mbox, max_box=m2box, cop=COP, inc=In, decim=3)
+
+    if windows_compile:
+        saveroot = filedialog.asksaveasfilename(title="Select file", defaultextension=".*",
+                                                filetypes=(("text files", "*.txt"), ("all files", "*.*")))
+    if linux_compile:
+        saveroot = filedialog.asksaveasfilename(title="Select file",
+                                                filetypes=(("text files", "*.txt"), ("all files", "*.*")))
+    fname, file_extension = os.path.splitext(saveroot)
+
+    if file_extension == '.h5':
+        fileh = tb.open_file(saveroot, mode='w')
+        table = fileh.create_table(fileh.root, 'Time_Domain_Metrics', TimeDomain, "HRV analysis - Time-Domain metrics")
+        table.append([(SDNN, SDANN, MeanRR, RMSSD, pNN50)])
+
+        table2 = fileh.create_table(fileh.root, 'Frequency_Domain_Metrics', FrequencyDomain,
+                                    "HRV analysis - Frequency-Domain metrics")
+        table2.append([(powVLF, powLF, powHF, perpowVLF, perpowLF, perpowHF, peak_freq_VLF, peak_freq_LF, peak_freq_HF,
+                        LF_HF_ratio),
+                       (powVLF2, powLF2, powHF2, perpowVLF2, perpowLF2, perpowHF2, peak_freq_VLF2, peak_freq_LF2,
+                        peak_freq_HF2, LF_HF_ratio2),
+                       (powVLF3, powLF3, powHF3, perpowVLF3, perpowLF3, perpowHF3, peak_freq_VLF3, peak_freq_LF3,
+                        peak_freq_HF3, LF_HF_ratio3),
+                       (powVLF4, powLF4, powHF4, perpowVLF4, perpowLF4, perpowHF4, peak_freq_VLF4, peak_freq_LF4,
+                        peak_freq_HF4, LF_HF_ratio4)])
+
+        table3 = fileh.create_table(fileh.root, 'Nonlinear_Metrics', NonlinearMets, "HRV analysis - Nonlinear metrics")
+        table3.append([(REC, DET, LAM, Lmean, Lmax, Vmean, Vmax, SD1, SD2, alp1, alp2)])
+
+        fileh.close()
+
+
+    elif file_extension == '.txt':
+        with open(saveroot, "w") as text_file:
+            if ((labelled_flag == 1) & (loaded_ann == 1)):
+                print(saveroot, '\n\n \t Quantified HRV Metrics and R-peak detection method analysis \n',
+                      file=text_file)
+            else:
+                print(saveroot, '\n\n \t\t\t Quantified HRV Metrics', file=text_file)
+
+            print('Time-Domain ', file=text_file)
+            print(f"  SDNN (ms): \t\t {SDNN} \n  SDANN (ms): \t\t {SDANN} \n  Mean RRI (ms): \t {MeanRR} \n" +
+                  f"  RMSSD (ms): \t\t {RMSSD} \n  pNN50 (ms): \t\t {pNN50} \n", file=text_file)
+            print('Frequency-Domain \t Welch \t BTuk \t LScarg\t AutoR', file=text_file)
+            print(' Absolute Power', file=text_file)
+            print(f"  VLF (s^2/Hz): \t {powVLF} \t {powVLF2} \t {powVLF3} \t {powVLF4} \n" +
+                  f"  LF (s^2/Hz): \t\t {powLF} \t {powLF2} \t {powLF3} \t {powLF4} \n" +
+                  f"  HF (s^2/Hz): \t\t {powHF} \t {powHF2} \t {powHF3} \t {powHF4} \n", file=text_file)
+            print(' Percentage Power', file=text_file)
+            print(f"  VLF (%): \t\t {perpowVLF} \t {perpowVLF2} \t {perpowVLF3} \t {perpowVLF4} \n" +
+                  f"  LF (%): \t\t {perpowLF} \t {perpowLF2} \t {perpowLF3} \t {perpowLF4} \n" +
+                  f"  HF (%): \t\t {perpowHF} \t {perpowHF2} \t {perpowHF3} \t {perpowHF4} \n", file=text_file)
+            print(' Peak Frequency', file=text_file)
+            print(f"  VLF (Hz): \t\t {peak_freq_VLF} \t {peak_freq_VLF2} \t {peak_freq_VLF3} \t {peak_freq_VLF4} \n" +
+                  f"  LF (Hz): \t\t {peak_freq_LF} \t {peak_freq_LF2} \t {peak_freq_LF3} \t {peak_freq_LF4} \n" +
+                  f"  HF (Hz): \t\t {peak_freq_HF} \t {peak_freq_HF2} \t {peak_freq_HF3} \t {peak_freq_HF4} \n",
+                  file=text_file)
+            print(' Frequency Ratio', file=text_file)
+            print(f"  LF/HF (Hz): \t\t {LF_HF_ratio} \t {LF_HF_ratio2} \t {LF_HF_ratio3} \t {LF_HF_ratio4} \n",
+                  file=text_file)
+            print('Nonlinear Metrics ', file=text_file)
+            print(' Recurrence Analysis', file=text_file)
+            print(
+                f"  REC (%): \t\t {REC} \n  DET (%): \t\t {DET} \n  LAM (%): \t\t {LAM} \n  Lmean (bts): \t\t {Lmean} \n" +
+                f"  Lmax (bts): \t\t {Lmax} \n  Vmean (bts): \t\t {Vmean} \n  Vmax (bts): \t\t {Vmax} \n",
+                file=text_file)
+            print(' Poincare Analysis', file=text_file)
+            print(f"  SD1 (%): \t\t {SD1} \n  SD2 (%): \t\t {SD2} \n", file=text_file)
+            print(' Detrended Fluctuation Analysis', file=text_file)
+            print(f"  alpha1 (%): \t\t {alp1} \n  alpha2 (%): \t\t {alp2} \n", file=text_file)
+
+    elif file_extension == '.mat':
+
+        metrics = np.zeros((3,), dtype=np.object)
+        metrics = {}
+        metrics['TimeDomain'] = {}
+        metrics['TimeDomain']['SDNN'] = SDNN
+        metrics['TimeDomain']['SDANN'] = SDANN
+        metrics['TimeDomain']['MeanRR'] = MeanRR
+        metrics['TimeDomain']['RMSSD'] = RMSSD
+        metrics['TimeDomain']['pNN50'] = pNN50
+        metrics['FrequencyDomain'] = {}
+        metrics['FrequencyDomain']['VLF_power'] = powVLF
+        metrics['FrequencyDomain']['LF_power'] = powLF
+        metrics['FrequencyDomain']['HF_power'] = powHF
+        metrics['FrequencyDomain']['VLF_P_power'] = perpowVLF
+        metrics['FrequencyDomain']['LF_P_power'] = perpowLF
+        metrics['FrequencyDomain']['HF_P_power'] = perpowHF
+        metrics['FrequencyDomain']['VLF_PF'] = peak_freq_VLF
+        metrics['FrequencyDomain']['LF_PF'] = peak_freq_LF
+        metrics['FrequencyDomain']['HF_PF'] = peak_freq_HF
+        metrics['FrequencyDomain']['LFHFRatio'] = LF_HF_ratio
+        metrics['Nonlinear'] = {}
+        metrics['Nonlinear']['Recurrence'] = REC
+        metrics['Nonlinear']['Determinism'] = DET
+        metrics['Nonlinear']['Laminarity'] = LAM
+        metrics['Nonlinear']['L_mean'] = Lmean
+        metrics['Nonlinear']['L_max'] = Lmax
+        metrics['Nonlinear']['V_mean'] = Vmean
+        metrics['Nonlinear']['V_max'] = Vmax
+        metrics['Nonlinear']['SD1'] = SD1
+        metrics['Nonlinear']['SD2'] = SD2
+        metrics['Nonlinear']['Alpha1'] = alp1
+        metrics['Nonlinear']['Alpha2'] = alp2
+
+        sio.savemat(saveroot, {'Metrics': metrics})
+
+    else:
+        print('Cannot export this file type')
+

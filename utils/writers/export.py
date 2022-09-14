@@ -60,9 +60,9 @@ class Exporter:
     Utility for exportation of RR-APET data
     """
 
-    def __init__(self, Preferences, system: str = 'linux'):
+    def __init__(self, preferences, system: str = 'linux'):
         self.system = system
-        self.Preferences = Preferences
+        self.pref = preferences
 
     def savefigure(self, draw_figure):
         """
@@ -84,43 +84,47 @@ class Exporter:
         else:
             draw_figure.savefig(path_for_save, format='eps', dpi=300)
 
-    def gen_metrics_for_save(self, R_t, Fs):
+    def gen_metrics_for_save(self, rpeaks, fs, t_rpeaks: np.ndarray = None, td: tuple = None, rqa: tuple = None,
+                             dfa: tuple = None, pc: tuple = None):
         """
         Generate the metrics if not passed to save file
         """
-        Rpeakss = np.reshape(R_t, (len(R_t),))
-
-        welchL = float(self.Preferences[5])
-        welchO = float(self.Preferences[6])
-        btval_input = int(self.Preferences[7])  # 10
-        omax_input = int(self.Preferences[8])  # 500
-        order = int(self.Preferences[9])  # 10
+        Rpeakss = np.reshape(rpeaks, (len(rpeaks),))
 
         # Time-domain Statistics
-        SDNN, SDANN, MeanRR, RMSSD, pNN50 = Calculate_Features(Rpeakss, Fs)
+        if td is None:
+            SDNN, SDANN, MeanRR, RMSSD, pNN50 = Calculate_Features(Rpeakss, fs)
+        else:
+            SDNN, SDANN, MeanRR, RMSSD, pNN50 = td
 
         # Frequency-domain Statistics
-        Rpeak_input = Rpeakss / Fs
+        Rpeak_input = Rpeakss / fs
         freq_results = []
         for i in range(4):
-            freq_results.append([Freq_Analysis(Rpeak_input, meth=i, decim=3, M=welchL, O=welchO, BTval=btval_input,
-                                               omega_max=omax_input, order=order)])
-
-        mbox = int(self.Preferences[10])
-        print(mbox)
-        COP = int(self.Preferences[11])
-        print(COP)
-        m2box = int(self.Preferences[12])
-        print(m2box)
-        In = int(self.Preferences[13])
-        print(In)
+            freq_results.append([Freq_Analysis(Rpeak_input, meth=i, decim=3, M=self.pref['values']['welch_L'],
+                                               O=self.pref['values']['welch_O'],
+                                               BTval=self.pref['values']['bltk_input'],
+                                               omega_max=self.pref['values']['ls_omega_max'],
+                                               order=self.pref['values']['ar_order'])])
 
         # Nonlinear statistics
         RRI = np.diff(Rpeak_input)
-        #    (pvp, Min=self.minbox, Max=self.maxbox, Inc=self.increm, COP=self.copbox)
-        REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = RQA(RRI, m=int(self.Preferences[14]), L=int(self.Preferences[15]))
-        SD1, SD2, c1, c2 = Poincare(RRI)
-        alp1, alp2, F = DFA(RRI, min_box=mbox, max_box=m2box, cop=COP, inc=In, decim=3)
+        if rqa is None:
+            REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = RQA(RRI, m=int(self.pref['values']['rqa_m']),
+                                                          L=int(self.pref['values']['rqa_l']))
+        else:
+            REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = rqa
+
+        if pc is None:
+            SD1, SD2, c1, c2 = Poincare(RRI)
+        else:
+            SD1, SD2, c1, c2 = pc
+
+        if dfa is None:
+            alp1, alp2, F = DFA(RRI, min_box=self.pref['values']['minbox'],  max_box=self.pref['values']['maxbox'],
+                                cop=self.pref['values']['copbox'], inc=self.pref['values']['increm'], decim=3)
+        else:
+            alp1, alp2, F = dfa
 
         output = {
             'Time-Domain Features': {
@@ -151,23 +155,32 @@ class Exporter:
             }
         }
 
+        if t_rpeaks is not None:
+            TP, FP, FN = test2(rpeaks, t_rpeaks, self.pref['values']['tt'])
+            Se, PP, ACC, DER = acc2(TP, FP, FN)
+            output['Detection Accuracy'] = {
+                'Se': Se,
+                'Pp': PP,
+                'Acc': ACC,
+                'Der': DER
+            }
+
         return output
 
-    def savemetrics(self, R_t, loaded_ann, labelled_flag, Fs):   # True_R_t, tt
+    def savemetrics(self, rpeaks, fs, t_rpeaks: np.ndarray = None, td: tuple = None, rqa: tuple = None,
+                    dfa: tuple = None, pc: tuple = None):
         """
 
-        :param R_t:
-        :param loaded_ann:
-        :param labelled_flag:
-        :param Fs:
+        :param rpeaks: R-peak timestamps.
+        :param fs: Sampling Frequency.
+        :param t_rpeaks: Optional. True R-peak timestamps. If provided predicted accuracy will be calculated.
+        :param td: Optional. Pre-calculated time domain results
+        :param rqa: Optional. Prec-calculated RQA results
+        :param dfa: Optional. Prec-calculated DFA results
+        :param pc: Optional. Prec-calculated Poincare results
         :return:
         """
-
-        # if loaded_ann == 1:
-        #     TP, FP, FN = test2(R_t, True_R_t, tt)
-        #     Se, PP, ACC, DER = acc2(TP, FP, FN)
-
-        output = self.gen_metrics_for_save(R_t, Fs)
+        output = self.gen_metrics_for_save(rpeaks, fs, t_rpeaks, td=td, rqa=rqa, dfa=dfa, pc=pc)
 
         if self.system == 'linux':
             saveroot = filedialog.asksaveasfilename(title="Select file", defaultextension=".*",
@@ -198,7 +211,7 @@ class Exporter:
 
         elif file_extension == '.txt':
             with open(saveroot, 'w') as text_file:
-                if (labelled_flag == 1) & (loaded_ann == 1):
+                if t_rpeaks is not None:
                     text_file.write('Quantified HRV Metrics and R-peak detection method analysis \n\n')
                 else:
                     text_file.write('Quantified HRV Metrics \n\n')
