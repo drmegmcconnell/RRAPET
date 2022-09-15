@@ -219,8 +219,8 @@ class HRVstatics(Frame):
         def _gen_label(txt, w, r_, c_):
             Label(self.freq_dat_low, text=txt, anchor=TKc.W, width=w).grid(row=r_, column=c_)
 
-        fq_vals = Freq_Analysis(self.Rpeak_input, meth=method, decim=3, M=self.pref['values']['welch_L'],
-                                O=self.pref['values']['welch_O'], BTval=self.pref['values']['bltk_input'],
+        fq_vals = Freq_Analysis(self.Rpeak_input, meth=method, decim=3, m=self.pref['values']['welch_L'],
+                                o=self.pref['values']['welch_O'], bt_val=self.pref['values']['bltk_input'],
                                 omega_max=self.pref['values']['ls_omega_max'], order=self.pref['values']['ar_order'])
 
         txt__ = ['VLF (Hz)', str(fq_vals[6]), 'LF (Hz)', fq_vals[7], 'HF (Hz)', fq_vals[8]]

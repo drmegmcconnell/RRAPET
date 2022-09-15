@@ -101,9 +101,9 @@ class Exporter:
         Rpeak_input = Rpeakss / fs
         freq_results = []
         for i in range(4):
-            freq_results.append([Freq_Analysis(Rpeak_input, meth=i, decim=3, M=self.pref['values']['welch_L'],
-                                               O=self.pref['values']['welch_O'],
-                                               BTval=self.pref['values']['bltk_input'],
+            freq_results.append([Freq_Analysis(Rpeak_input, meth=i, decim=3, m=self.pref['values']['welch_L'],
+                                               o=self.pref['values']['welch_O'],
+                                               bt_val=self.pref['values']['bltk_input'],
                                                omega_max=self.pref['values']['ls_omega_max'],
                                                order=self.pref['values']['ar_order'])])
 
@@ -111,7 +111,7 @@ class Exporter:
         RRI = np.diff(Rpeak_input)
         if rqa is None:
             REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = RQA(RRI, m=int(self.pref['values']['rqa_m']),
-                                                          L=int(self.pref['values']['rqa_l']))
+                                                          l_=int(self.pref['values']['rqa_l']))
         else:
             REC, DET, LAM, Lmean, Lmax, Vmean, Vmax = rqa
 
