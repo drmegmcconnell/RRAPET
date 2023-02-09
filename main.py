@@ -140,10 +140,11 @@ root.style.configure('C.TButton', background='light grey', padding=0, relief='ra
 root.style.configure('B.TButton', background='white smoke', padding=0, relief='raised', width=0, highlightthickness=0)
 
 set_initial_values()
-exp = Exporter(Preferences)
+exp = Exporter(Pref_dict)
 
 # ~~~~~~~~~~~~~~ KEY PRESS FUNCTIONS ~~~~~~~~~~~~~~~~~~~#
-cust_text, cust_subheader, cust_subheadernb, cust_header = headerStyles(Preferences)
+cust_text, cust_subheader, cust_subheadernb, cust_header = headerStyles(Pref_dict['values']['font'],
+                                                                        Pref_dict['values']['base_font_size'])
 
 
 def Invert():

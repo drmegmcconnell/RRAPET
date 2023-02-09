@@ -5,7 +5,7 @@ Stylising the Program
 from tkinter import font
 
 
-def headerStyles(family: str, base_font_size: int):
+def headerStyles(family: str, base_font_size: int = 12):
     """
     Header Styles
     """
