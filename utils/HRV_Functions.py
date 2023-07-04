@@ -1,6 +1,7 @@
 """
 Functions for the calculation of HRV metrics
 Author: Meghan McConnell
+Date: July 2023
 """
 
 # ========================== FUNCTIONS =========================#
