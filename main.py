@@ -3,30 +3,25 @@ RR-APET
 
 Author: Meghan McConnell
 """
-# import sys
+
 import os
-# from os import listdir
-# from os.path import isfile, join, splitext
 import tkinter.constants as TKc
 import scipy.io as sio
 import h5py
 import wfdb
 from tkinter import Frame, Tk, Scale, Menu, StringVar, filedialog, Toplevel, \
-    Label, BOTTOM, TOP, BOTH, messagebox, RIGHT, Entry, PhotoImage  # END, Button, ANCHOR, FALSE, Listbox, Scrollbar
+    Label, BOTTOM, TOP, BOTH, messagebox, RIGHT, Entry   # PhotoImage, END, Button, ANCHOR, FALSE, Listbox, Scrollbar
 from tkinter.ttk import Style, OptionMenu
 from tkinter.ttk import Button as Button2
 from tkinter.ttk import Label as Label2
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import sys
 from PIL import Image, ImageTk
 
-sys.path.append('/home/meg/Documents/RRAPET_Linux/')
-
 from utils import MHTD, pan_tompkin, ECG_processing, Exporter, H5_Selector
-from utils.HRV_Functions import *
 from utils.peak_detection.custom_detection import my_function
 from utils.Style_Functions import *
 from utils.Graphical_Functions import *
+from utils.readers import read_txt_file
 
 global enable, tt, edit_flag, loaded_ann, invert_flag, warnings_on, enable2, plot_pred, plot_ann, R_t, \
     h, pref, lower_RHS, button_help_on, delete_flag, TOTAL_FRAME, windows_compile, linux_compile, cnt, \
@@ -179,6 +174,60 @@ def __onclick(event):
 
     bound1 = int(0.05 / (1 / Fs))  # Gets approximately +- 50ms le-way with button click
 
+    def click_function1(rt, ramp):
+        xx = int(event.xdata * Fs)
+        ll = np.size(rt)
+
+        if invert_flag == 0:
+            ramptemp = np.max(dat[xx - bound1:xx + bound1])
+            pl = np.argmax(dat[xx - bound1:xx + bound1])
+        else:
+            ramptemp = np.min(dat[xx - bound1:xx + bound1])
+            pl = np.argmin(dat[xx - bound1:xx + bound1])
+
+        rttemp = xx - (bound1 + 1) + pl
+
+        pl2 = np.argmin(np.abs(rt - rttemp))
+
+        if rttemp < rt[pl2]:
+            a = rt[0:pl2]
+            b = rt[pl2:ll]
+            c = ramp[0:pl2]
+            d = ramp[pl2:ll]
+
+        else:
+            a = rt[0:pl2 + 1]
+            b = rt[pl2 + 1:ll]
+            c = ramp[0:pl2 + 1]
+            d = ramp[pl2 + 1:ll]
+
+        rt = np.append(a, rttemp)
+        rt = np.append(rt, b)
+        ramp = np.append(c, ramptemp)
+        ramp = np.append(ramp, d)
+
+        return rt, ramp
+
+    def click_function2(rt, ramp):
+        if invert_flag == 0:
+            pl = np.argmin(np.abs(rt - (event.xdata * Fs)))
+        else:
+            pl = np.argmax(np.abs(rt - (event.xdata * Fs)))
+
+        leng = np.size(rt)
+
+        a = rt[0:pl]
+        b = rt[pl + 1:leng]
+
+        rt = np.append(a, b)
+
+        c = ramp[0:pl]
+        d = ramp[pl + 1:leng]
+
+        ramp = np.append(c, d)
+
+        return rt, ramp
+
     if ((event.button == 1) and (delete_flag == 0)) or ((event.button == 2) and (delete_flag == 1)):
         if plot_ann == 1 and plot_pred == 0:  # Checks to see if editing loaded annotations or predicted annotations
             if loaded_ann == 0 & warnings_on:
@@ -186,44 +235,7 @@ def __onclick(event):
                                                   "RRI plot to RR_Predicitions or load in previously determined "
                                                   "annotations.")
             else:
-                xx = int(event.xdata * Fs)
-                ll = np.size(True_R_t)
-
-                if invert_flag == 0:
-                    R_amp_temp = np.max(dat[xx - bound1:xx + bound1])
-                    pl = np.argmax(dat[xx - bound1:xx + bound1])
-                else:
-                    R_amp_temp = np.min(dat[xx - bound1:xx + bound1])
-                    pl = np.argmin(dat[xx - bound1:xx + bound1])
-
-                R_t_temp = xx - (bound1 + 1) + pl
-
-                pl2 = np.argmin(np.abs(True_R_t - R_t_temp))
-
-                if R_t_temp < True_R_t[pl2]:
-                    a = True_R_t[0:pl2]
-                    b = True_R_t[pl2:ll]
-
-                    True_R_t = np.append(a, R_t_temp)
-                    True_R_t = np.append(True_R_t, b)
-
-                    c = True_R_amp[0:pl2]
-                    d = True_R_amp[pl2:ll]
-
-                    True_R_amp = np.append(c, R_amp_temp)
-                    True_R_amp = np.append(True_R_amp, d)
-                else:
-                    a = True_R_t[0:pl2 + 1]
-                    b = True_R_t[pl2 + 1:ll]
-
-                    True_R_t = np.append(a, R_t_temp)
-                    True_R_t = np.append(True_R_t, b)
-
-                    c = True_R_amp[0:pl2 + 1]
-                    d = True_R_amp[pl2 + 1:ll]
-
-                    True_R_amp = np.append(c, R_amp_temp)
-                    True_R_amp = np.append(True_R_amp, d)
+                True_R_t, True_R_amp = click_function1(rt=True_R_t, ramp=True_R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
                       True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
@@ -234,44 +246,7 @@ def __onclick(event):
                 messagebox.showwarning("Warning", "Cannot edit empty annotations \n\nPlease generate annotations "
                                                   "using the prediction functionality.")
             else:
-                xx = int(event.xdata * Fs)
-                ll = np.size(R_t)
-
-                if invert_flag == 0:
-                    R_amp_temp = np.max(dat[xx - bound1:xx + bound1])
-                    pl = np.argmax(dat[xx - bound1:xx + bound1])
-                else:
-                    R_amp_temp = np.min(dat[xx - bound1:xx + bound1])
-                    pl = np.argmin(dat[xx - bound1:xx + bound1])
-
-                R_t_temp = xx - (bound1 + 1) + pl
-
-                pl2 = np.argmin(np.abs(R_t - R_t_temp))
-
-                if R_t_temp < R_t[pl2]:
-                    a = R_t[0:pl2]
-                    b = R_t[pl2:ll]
-
-                    R_t = np.append(a, R_t_temp)
-                    R_t = np.append(R_t, b)
-
-                    c = R_amp[0:pl2]
-                    d = R_amp[pl2:ll]
-
-                    R_amp = np.append(c, R_amp_temp)
-                    R_amp = np.append(R_amp, d)
-                else:
-                    a = R_t[0:pl2 + 1]
-                    b = R_t[pl2 + 1:ll]
-
-                    R_t = np.append(a, R_t_temp)
-                    R_t = np.append(R_t, b)
-
-                    c = R_amp[0:pl2 + 1]
-                    d = R_amp[pl2 + 1:ll]
-
-                    R_amp = np.append(c, R_amp_temp)
-                    R_amp = np.append(R_amp, d)
+                R_t, R_amp = click_function1(rt=R_t, ramp=R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
                       True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
@@ -291,48 +266,18 @@ def __onclick(event):
                                                   " RRI plot to RR_Predicitions or load in previously determined "
                                                   "annotations.")
             elif loaded_ann:
-                if invert_flag == 0:
-                    pl = np.argmin(np.abs(True_R_t - (event.xdata * Fs)))
-                else:
-                    pl = np.argmax(np.abs(True_R_t - (event.xdata * Fs)))
 
-                leng = np.size(True_R_t)
-
-                a = True_R_t[0:pl]
-                b = True_R_t[pl + 1:leng]
-
-                True_R_t = np.append(a, b)
-
-                c = True_R_amp[0:pl]
-                d = True_R_amp[pl + 1:leng]
-
-                True_R_amp = np.append(c, d)
+                True_R_t, True_R_amp = click_function2(rt=True_R_t, ramp=True_R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
                       True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
 
         elif plot_pred == 1 and plot_ann == 0:
-
             if len(R_t) == 0 & warnings_on:
                 messagebox.showwarning("Warning", "Cannot edit empty annotations \n\nPlease generate annotations "
                                                   "using the prediction functionality.")
             elif len(R_t) > 0:
-                if invert_flag == 0:
-                    pl = np.argmin(np.abs(R_t - (event.xdata * Fs)))
-                else:
-                    pl = np.argmax(np.abs(R_t - (event.xdata * Fs)))
-
-                leng = np.size(R_t)
-
-                a = R_t[0:pl]
-                b = R_t[pl + 1:leng]
-
-                R_t = np.append(a, b)
-
-                c = R_amp[0:pl]
-                d = R_amp[pl + 1:leng]
-
-                R_amp = np.append(c, d)
+                R_t, R_amp = click_function2(rt=R_t, ramp=R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
                       True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
@@ -350,45 +295,8 @@ def __onclick(event):
                                        "Cannot edit 'imported annotations' \n\nPlease note: Switch set the RRI plot "
                                        "to RR_Predicitions or load in previously determined annotations.")
             elif loaded_ann:  # Checks to see if editing loaded annotations or predicted annotations
-                xx = int(event.xdata * Fs)
-                ll = np.size(True_R_t)
 
-                if invert_flag == 0:
-                    R_amp_temp = np.min(dat[xx - bound1:xx + bound1])
-                    pl = np.argmin(dat[xx - bound1:xx + bound1])
-
-                else:
-                    R_amp_temp = np.max(dat[xx - bound1:xx + bound1])
-                    pl = np.argmax(dat[xx - bound1:xx + bound1])
-
-                R_t_temp = xx - (bound1 + 1) + pl
-
-                pl2 = np.argmin(np.abs(True_R_t - R_t_temp))
-
-                if R_t_temp < True_R_t[pl2]:
-                    a = True_R_t[0:pl2]
-                    b = True_R_t[pl2:ll]
-
-                    True_R_t = np.append(a, R_t_temp)
-                    True_R_t = np.append(True_R_t, b)
-
-                    c = True_R_amp[0:pl2]
-                    d = True_R_amp[pl2:ll]
-
-                    True_R_amp = np.append(c, R_amp_temp)
-                    True_R_amp = np.append(True_R_amp, d)
-                else:
-                    a = True_R_t[0:pl2 + 1]
-                    b = True_R_t[pl2 + 1:ll]
-
-                    True_R_t = np.append(a, R_t_temp)
-                    True_R_t = np.append(True_R_t, b)
-
-                    c = True_R_amp[0:pl2 + 1]
-                    d = True_R_amp[pl2 + 1:ll]
-
-                    True_R_amp = np.append(c, R_amp_temp)
-                    True_R_amp = np.append(True_R_amp, d)
+                True_R_t, True_R_amp = click_function1(rt=True_R_t, ramp=True_R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
                       True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
@@ -399,45 +307,7 @@ def __onclick(event):
                 messagebox.showwarning("Warning", "Cannot edit empty annotations \n\nPlease generate annotations "
                                                   "using the prediction functionality.")
             elif len(R_t) > 0:
-                xx = int(event.xdata * Fs)
-                ll = np.size(R_t)
-
-                if invert_flag == 0:
-                    R_amp_temp = np.min(dat[xx - bound1:xx + bound1])
-                    pl = np.argmin(dat[xx - bound1:xx + bound1])
-
-                else:
-                    R_amp_temp = np.max(dat[xx - bound1:xx + bound1])
-                    pl = np.argmax(dat[xx - bound1:xx + bound1])
-
-                R_t_temp = xx - (bound1 + 1) + pl
-
-                pl2 = np.argmin(np.abs(R_t - R_t_temp))
-
-                if R_t_temp < R_t[pl2]:
-                    a = R_t[0:pl2]
-                    b = R_t[pl2:ll]
-
-                    R_t = np.append(a, R_t_temp)
-                    R_t = np.append(R_t, b)
-
-                    c = R_amp[0:pl2]
-                    d = R_amp[pl2:ll]
-
-                    R_amp = np.append(c, R_amp_temp)
-                    R_amp = np.append(R_amp, d)
-                else:
-                    a = R_t[0:pl2 + 1]
-                    b = R_t[pl2 + 1:ll]
-
-                    R_t = np.append(a, R_t_temp)
-                    R_t = np.append(R_t, b)
-
-                    c = R_amp[0:pl2 + 1]
-                    d = R_amp[pl2 + 1:ll]
-
-                    R_amp = np.append(c, R_amp_temp)
-                    R_amp = np.append(R_amp, d)
+                R_t, R_amp = click_function1(rt=R_t, ramp=R_amp)
 
                 draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag,
                       True_R_t, True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
@@ -525,55 +395,45 @@ def Prediction_mode(mode_type, thr_ratio=1.25, SBL=5, MAG_LIM=0.10, ENG_LIM=0.05
     if Preferences[22] == '1':  # if Volts multiple to get mV
         dat = dat * 1e3
 
+    labelled_flag = 1
+
     if mode_type == 1:
         # ========================== Set Values =========================#
-        labelled_flag = 1
         fs = Fs
         fpass = 0.5
         fstop = 45
         # ====================== Conduct Predictions =======================#
         R_t = MHTD(dat, fs, fpass, fstop, thr_ratio=thr_ratio, sbl=SBL, mag_lim=MAG_LIM, eng_lim=ENG_LIM, min_L=MIN_L)
 
-        siz = np.size(R_t)
-        R_t = np.reshape(R_t, [siz, 1])
-        R_amp = np.zeros(siz)
-        for i in range(siz):
-            R_amp[i] = dat[int(R_t[i])]
-        if len(R_amp) == 1:
-            R_amp = np.transpose(R_amp)
-        draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
-              True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
     elif mode_type == 2:
         # ========================== Set Values =========================#
-        labelled_flag = 1
         data_input = np.reshape(dat, (len(dat),))
         # ====================== Conduct Predictions =======================#
         R_amp, R_t, delay = pan_tompkin(data_input, Fs, 0)
-        draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
-              True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
+
     elif mode_type == 3:
-        # ========================== Set Values =========================#
-        labelled_flag = 1
         # ====================== Conduct Predictions =======================#
         R_t = ECG_processing(dat)
-        siz = np.size(R_t)
-        R_t = np.reshape(R_t, [siz, 1])
-        R_amp = np.zeros(siz)
-        for i in range(siz):
-            R_amp[i] = dat[int(R_t[i])]
-        if len(R_amp) == 1:
-            R_amp = np.transpose(R_amp)
-        draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
-              True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
+
     elif mode_type == 4:
-        # ========================== Set Values =========================#
-        labelled_flag = 1
         # ====================== Conduct Predictions =======================#
         R_t, R_amp = my_function(dat)
+
+    if 1 <= mode_type <= 4:
+        if mode_type == 1 or mode_type == 3:
+            siz = np.size(R_t)
+            R_t = np.reshape(R_t, [siz, 1])
+            R_amp = np.zeros(siz)
+            for i in range(siz):
+                R_amp[i] = dat[int(R_t[i])]
+            if len(R_amp) == 1:
+                R_amp = np.transpose(R_amp)
+
         draw1(x, xminn, Fs, dat, plot_fig, graphCanvas, fig, R_t, R_amp, loaded_ann, labelled_flag, True_R_t,
               True_R_amp, disp_length, plot_pred, plot_ann, fig2, plot_fig2, RR_interval_Canvas)
     else:
-        print('not imported yet')
+        messagebox.showwarning("Warning",
+                               "Mode_Type selected is unavaliable' \n\nPlease select a valid mode.")
 
 
 def check_orientation(data):
@@ -708,37 +568,6 @@ def load_h5(filename, ftype, h5folder, file_extension):
     elif (file_extension == '.dat') or (file_extension == '.hea'):
         load_dat, fields = wfdb.rdsamp(filename)
         rub, columns = np.shape(load_dat)
-
-
-def read_txt_file(fname):
-    """
-    Read a text file
-    :param fname:
-    """
-
-    file = open(fname, 'r')
-    if len(F) == 0 & warnings_on:
-        messagebox.showwarning("Warning", "The file you have selected is unreadable. Please ensure that "
-                                          "the file interest is saved in the correct format. For further "
-                                          "information, refer to the 'Help' module")
-    else:
-        if Preferences[24] == '0':
-            temp = file.read().split()
-        elif Preferences[24] == '1':
-            temp = file.read().split(":")
-        else:
-            temp = file.read().split(";")
-        var1 = len(temp)
-        data = np.zeros(np.size(temp))
-        for i in range(var1):  # for i in range(len(temp)):
-            data[i] = float(temp[i].rstrip('\n'))
-        file.seek(0)
-        temp2 = file.readlines()
-        var2 = len(temp2)
-        columns = int(var1 / var2)
-        data = np.reshape(data, [len(temp2), int(columns)])
-        file.close()
-        return data
 
 
 def Prediction_no_plot(ECGdata, mode_type, fs, thr_ratio=1.25, SBL=5, MAG_LIM=0.10, ENG_LIM=0.05, MIN_L=0.3):
@@ -1048,7 +877,7 @@ class RRAPET(Frame):
         closebutton.pack(side='left')
         Link_hover_popup_tips(closebutton, text='Close file (ctrl+Q)')
 
-        fig2 = Figure(tight_layout=1, facecolor='#f5f5f5')
+        fig2 = Figure(tight_layout=True, facecolor='#f5f5f5')
         plot_fig2 = fig2.add_subplot(111)
 
         RR_interval_Canvas = FigureCanvasTkAgg(fig2, master=RRI_plot_housing)
@@ -1203,7 +1032,7 @@ class RRAPET(Frame):
         RRImenu.pack(side='top')
         self.RRI_variable.trace('w', self._change_dropdown)
 
-        fig = Figure(tight_layout=1,
+        fig = Figure(tight_layout=True,
                      facecolor='#f5f5f5')  # Configuration of the Figure to be plotted on the first canvas
         plot_fig = fig.add_subplot(111)  # Adding a subplot which can be updated for viewing of ECG and R-peaks
 
@@ -1212,7 +1041,7 @@ class RRAPET(Frame):
         # Ensuring that "graphCanvas" can be bound to mouse input later on
         # graphCanvas._tkcanvas  # .pack(side=TOP, fill=BOTH, expand=True)
 
-        fig2 = Figure(tight_layout=1, facecolor='#f5f5f5')
+        fig2 = Figure(tight_layout=True, facecolor='#f5f5f5')
         plot_fig2 = fig2.add_subplot(111)
 
         RR_interval_Canvas = FigureCanvasTkAgg(fig2, master=RRI_housing)
@@ -1220,7 +1049,7 @@ class RRAPET(Frame):
         # RR_interval_Canvas._tkcanvas
         RR_interval_Canvas.mpl_connect('button_press_event', onclick2)
 
-        Slider = Scale(Slider_housing, from_=0, to=100, resolution=0.001, showvalue=0, orient=TKc.HORIZONTAL,
+        Slider = Scale(Slider_housing, from_=0, to=100, resolution=0.001, showvalue=False, orient=TKc.HORIZONTAL,
                        bg='white', command=self._getSlideValue, length=screen_width - 0.05 * screen_width)
         Slider.pack(side=BOTTOM)
 
@@ -1372,6 +1201,7 @@ class RRAPET(Frame):
         global R_t
         global labelled_flag
         global Preferences
+        global warnings_on
 
         if ECG_pref_on:
             input_file = filedialog.Open(self, filetypes=self.ftypes)
@@ -1385,7 +1215,7 @@ class RRAPET(Frame):
                 self.plot_wind.destroy()
 
             if file_extension == '.txt':
-                load_dat = read_txt_file(fname=File)
+                load_dat = read_txt_file(fname=File, sep=Preferences[24], warnings_on=warnings_on)
                 load_dat, rows, columns = check_orientation(load_dat)
                 check_for_fs_col()
 
@@ -1419,7 +1249,7 @@ class RRAPET(Frame):
 
             column_number = 1
             if file_extension == '.txt':
-                og_ann = read_txt_file(fname=File)
+                og_ann = read_txt_file(fname=File, sep=Preferences[24], warnings_on=warnings_on)
                 R_t = og_ann[:, (column_number - 1)]
 
             elif (file_extension == '.h5') or (file_extension == '.mat'):
@@ -1479,6 +1309,7 @@ class RRAPET(Frame):
         global True_R_t
         global True_R_amp
         global Preferences
+        global warnings_on
 
         if ECG_pref_on:
             ftypes = [('Text files', '*.txt'), ('Mat files', '*.mat'), ('HDF5 files', '*.h5'), ('WFDB files', '*.atr'),
@@ -1493,7 +1324,7 @@ class RRAPET(Frame):
             loaded_ann = 1
             column_number = 1
             if file_extension == '.txt':
-                og_ann = read_txt_file(annfile)
+                og_ann = read_txt_file(fname=annfile, sep=Preferences[24], warnings_on=warnings_on)
                 True_R_t = og_ann[:, (column_number - 1)]
 
                 if Preferences[23] == '1':

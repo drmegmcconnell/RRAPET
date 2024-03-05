@@ -37,7 +37,7 @@ for fname in file_names:
                                                     *RQA(rri),
                                                     alp1, alp2,
                                                     sd1, sd2,
-                                                    *Freq_Analysis(Rpeaks=r_loc, meth=3, decim=3, omega_max=500))
+                                                    *Freq_Analysis(r_peaks=r_loc, meth=3, decim=3, omega_max=500))
                                                    ).reshape(1, len(cols)),
                                      columns=cols)))
 
